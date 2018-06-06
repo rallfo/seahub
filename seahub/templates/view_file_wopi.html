@@ -1,5 +1,5 @@
 <!doctype html>
-{% load i18n %}
+{% load i18n staticfiles %}
 <html>
 <head>
     <title>{{doc_title}}</title>
@@ -38,9 +38,58 @@
 
 <iframe id="office_frame" name="office_frame" class="hide" allowfullscreen ></iframe>
 
+<script type="text/javascript" src="{% static "scripts/lib/jquery.min.js" %}" id="jquery"></script>{# 'id="jquery"' is for pdf file view with pdf2html #}
 <script type="text/javascript">
     document.getElementById('office_form').submit();
     document.getElementById('office_frame').className = '';
+
+    function getCookie(name) {
+        var cookieValue = null;
+        if (document.cookie && document.cookie != '') {
+            var cookies = document.cookie.split(';');
+            for (var i = 0; i < cookies.length; i++) {
+                var cookie = jQuery.trim(cookies[i]);
+                // Does this cookie string begin with the name we want?
+                if (cookie.substring(0, name.length + 1) == (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    function prepareCSRFToken(xhr, settings) {
+        if (!(/^http:.*/.test(settings.url) || /^https:.*/.test(settings.url))) {
+            // Only send the token to relative URLs i.e. locally.
+            xhr.setRequestHeader("X-CSRFToken", getCookie('csrftoken'));
+        }
+    }
+
+    var interval;
+    refreshLock = function() {
+        $.ajax({
+            url: '{% url "api-v2.1-file-view" repo_id %}' + '?p={{path|urlencode}}',
+            type: 'PUT',
+            dataType: 'json',
+            data: {
+                'operation': 'refresh-lock',
+            },
+            cache: false,
+            beforeSend: prepareCSRFToken,
+            success: function(data) {
+            },
+            error: function(xhr) {
+                if (xhr.responseText) {
+                    feedback(JSON.parse(xhr.responseText).error_msg, 'error');
+                } else {
+                    feedback("{% trans "Failed. Please check the network." %}", 'error');
+                }
+                clearInterval(interval);
+            }
+        });
+    };
+    interval = setInterval(refreshLock, 60 * 1000);
 </script>
 </body>
 </html>
